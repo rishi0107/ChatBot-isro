@@ -1,0 +1,187 @@
+{%load static%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href={%static "chat.css" %}>
+    <title>Document</title>
+    <style>
+        .messages__item {
+            margin-bottom: 10px;
+        }
+    
+        .messages__item--visitor {
+            text-align: right;
+        }
+    
+        .messages__item--operator {
+            text-align: left;
+        }
+    </style>
+    <style>
+        /* Add styles for the mic button and animation */
+        #recordButton {
+            position: relative;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        #micIcon {
+            width: 20px; /* Adjust the size of the mic icon */
+            height: 20px; /* Adjust the size of the mic icon */
+        }
+
+        #redDot {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background-color: red; /* Change the color as needed */
+            border-radius: 50%;
+            animation: pulse 1s infinite; /* Adjust the animation duration as needed */
+            display: none; /* Initially hide the red dot */
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+            50% {
+                transform: scale(1.5);
+                opacity: 0.2;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chatbox">
+        <div class="chatbox__support">
+            <div class="chatbox__header">
+                Chat support!
+            </div>
+            <div class="chatbox__messages">
+                <!-- Your chat messages go here -->
+            </div>
+            <div class="chatbox__footer">
+                <!-- Your chat input field goes here -->
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="file" name="audio" accept="audio/*" style="display:none;" id="audioInput"/>
+                    <button type="button" id="recordButton"><img id="micIcon" src="{% static "micro.png" %}" alt="Mic Icon">
+                        <div id="redDot"></div></button>
+                    <input type="submit" value="Send" style="display:none;">
+                </form>
+            </div>
+        </div>
+        <div class="chatbox__button">
+            <button>Branch-1</button>
+        </div>
+    </div>
+
+    <script>
+        
+        const recordButton = document.getElementById('recordButton');
+    const redDot = document.getElementById('redDot');
+        recordButton.addEventListener('click', startRecording);
+        
+        function startRecording() {
+            redDot.style.display = 'block';
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    const mediaRecorder = new MediaRecorder(stream);
+                    const audioChunks = [];
+        
+                    mediaRecorder.ondataavailable = event => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
+                        }
+                    };
+        
+                    mediaRecorder.onstop = () => {
+                        redDot.style.display = 'none';
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        sendAudioData(audioBlob);
+                    };
+        
+                    mediaRecorder.start();
+        
+                    setTimeout(() => {
+                        mediaRecorder.stop();
+                    }, 5000); // Record for 5 seconds (adjust as needed)
+                })
+                .catch(error => {
+                    redDot.style.display = 'none';
+                    console.error('Error accessing microphone:', error);
+                });
+        }
+        
+        function sendAudioData(audioBlob) {
+            const formData = new FormData();
+            formData.append('audio', audioBlob);
+        
+            // Access the CSRF token input
+            const csrfTokenInput = document.getElementsByName('csrfmiddlewaretoken')[0];
+            const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
+        
+            fetch('', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Handle the response from the server
+                console.log('Server Response:', data);
+                displayUserMessage(data.response);
+                displayBotResponse(data.text);
+                
+                
+                
+                // Perform any additional processing or display the response in the UI
+            })
+            .catch(error => {
+                console.error('Error sending audio:', error);
+            });
+        }
+        const messagesContainer = document.querySelector('.chatbox__messages');
+
+        function displayUserMessage(message) {
+            console.log(message);
+            displayMessage('User', message);
+        }
+
+        function displayBotResponse(response) {
+            displayMessage('Bot', response);
+        }
+
+        function displayMessage(speaker, message) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('messages__item');
+
+            if (speaker === 'User') {
+                messageElement.classList.add('messages__item--visitor');
+            } else {
+                messageElement.classList.add('messages__item--operator');
+            }
+
+            messageElement.textContent = message;
+            messagesContainer.appendChild(messageElement);
+        }
+
+    </script>
+    <script src={%static "app.js"%}></script>
+  
+</body>
+</html>
